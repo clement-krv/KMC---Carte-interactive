@@ -164,20 +164,32 @@
         drawingEnabled = false;
         map.getElement().classList.remove('drawing-cursor');
         polygonLineString.pushPoint(points[0]);
-        if (polyline) polyline.setGeometry(polygonLineString);
+        
+        if (polyline) {
+          try {
+            polyline.setGeometry(polygonLineString);
+          } catch (error) {
+            console.error("Erreur lors de la mise à jour de la géométrie du polygone:", error);
+          }
+        }
+
         instructions.textContent = "Polygone fermé.";
         calculateArea();
       } else {
         polygonLineString.pushPoint(coord);
         points.push(coord);
 
-        if (!polyline) {
+        if (!polyline && polygonLineString.getPointCount() > 1) {
           polyline = new H.map.Polyline(polygonLineString, {
             style: { strokeColor: 'rgba(255, 255, 0, 0.7)', lineWidth: 3 }
           });
           map.addObject(polyline);
-        } else {
-          polyline.setGeometry(polygonLineString);
+        } else if (polyline) {
+          try {
+            polyline.setGeometry(polygonLineString);
+          } catch (error) {
+            console.error("Erreur lors de la mise à jour de la géométrie du polygone:", error);
+          }
         }
 
         if (points.length === 1) {
