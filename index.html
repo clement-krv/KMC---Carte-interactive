@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KMC x CK - Map</title>
+
+    <!-- CDN Tailwind CSS pour le style -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Scripts pour intégrer les API Here Maps -->
+    <script src="https://js.api.here.com/v3/3.1/mapsjs-core.js"></script>
+    <script src="https://js.api.here.com/v3/3.1/mapsjs-service.js"></script>
+    <script src="https://js.api.here.com/v3/3.1/mapsjs-mapevents.js"></script>
+    <script src="https://js.api.here.com/v3/3.1/mapsjs-ui.js"></script>
+    <link rel="stylesheet" type="text/css" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
+</head>
+<body class="flex flex-col items-center justify-center h-screen bg-gray-100 space-y-4">
+
+    <!-- Conteneur de la carte avec style Tailwind pour l'affichage -->
+    <div id="mapContainer" class="w-[28rem] h-96 border border-gray-300 rounded-lg shadow-lg"></div>
+
+    <!-- Champ de saisie pour rechercher une adresse sous la carte -->
+    <div class="w-[28rem] relative">
+        <input id="addressInput" type="text" placeholder="Entrez une adresse" class="w-full p-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none">
+    </div>
+
+    <!-- Liste des suggestions d'adresses affichée sous le champ de recherche -->
+    <ul id="suggestions" class="w-[28rem] max-h-40 bg-white border border-gray-300 rounded-lg shadow-lg overflow-auto mt-2"></ul>
+
+    <script>
+        // Initialiser la plateforme Here Maps avec la clé API
+        const platform = new H.service.Platform({
+        apikey: '6CZQ8XgX54xFIrG8Zmpd19VKZYUDdUUnqD3BdU4XBJE'
+        });
+
+        // Obtenir une couche satellite sans étiquettes (xbase masque les noms de rues et labels)
+        const defaultLayers = platform.createDefaultLayers();
+        const satelliteLayer = defaultLayers.raster.satellite.xbase;
+
+        // Initialiser la carte dans le conteneur "mapContainer" avec la vue satellite centrée sur Paris
+        const map = new H.Map(document.getElementById('mapContainer'), satelliteLayer, {
+        center: { lat: 48.8566, lng: 2.3522 }, // Coordonnées de Paris
+        zoom: 12, // Niveau de zoom initial
+        pixelRatio: window.devicePixelRatio || 1
+        });
+
+        // Ajouter un comportement de zoom et déplacement à la carte
+        const behavior = new H.mapevents.Behavior(new H.mapevents.MapEvents(map));
+    
+        // Interface utilisateur avec contrôle de zoom, sans contrôle de changement de vue
+        const ui = H.ui.UI.createDefault(map, defaultLayers);
+        ui.removeControl('mapsettings'); // Retirer le contrôle de type de carte
+
+        // Assurer que la carte se redimensionne correctement avec la fenêtre
+        window.addEventListener('resize', () => map.getViewPort().resize());
+
+        // Fonction pour obtenir des suggestions d'adresses basées sur l'API Here Autosuggest
+        async function getSuggestions(query) {
+        // Construire l'URL de l'API avec la requête d'adresse et les coordonnées de base
+            const url = `https://autosuggest.search.hereapi.com/v1/autosuggest?apikey=6CZQ8XgX54xFIrG8Zmpd19VKZYUDdUUnqD3BdU4XBJE&q=${query}&at=48.8566,2.3522`;
+            const response = await fetch(url);
+            const data = await response.json();
+            return data.items.slice(0, 4); // Limiter les suggestions à 4 résultats
+        }
+
+        // Gestion de l'entrée de l'utilisateur dans le champ de recherche et affichage des suggestions
+        const addressInput = document.getElementById('addressInput');
+        const suggestionsList = document.getElementById('suggestions');
+
+        addressInput.addEventListener('input', async () => {
+            const query = addressInput.value;
+            if (query.length > 2) { // Rechercher si l'entrée est de plus de 2 caractères
+                const suggestions = await getSuggestions(query);
+                suggestionsList.innerHTML = ''; // Effacer les suggestions précédentes
+                suggestions.forEach(item => {
+                    const li = document.createElement('li');
+                    li.textContent = item.title; // Afficher le titre de l'adresse
+                    li.className = 'p-2 cursor-pointer hover:bg-gray-100';
+                    li.addEventListener('click', () => {
+                        addressInput.value = item.title; // Mettre l'adresse sélectionnée dans le champ de saisie
+                        suggestionsList.innerHTML = ''; // Effacer les suggestions
+                        centerMapOnAddress(item.position.lat, item.position.lng); // Centrer la carte sur l'adresse
+                    });
+                suggestionsList.appendChild(li); // Ajouter la suggestion à la liste
+                });
+            } else {
+                suggestionsList.innerHTML = ''; // Effacer les suggestions si la requête est courte
+            }
+        });
+
+        // Fonction pour centrer la carte sur une adresse sélectionnée avec un niveau de zoom plus précis
+        function centerMapOnAddress(lat, lng) {
+            map.setCenter({ lat: lat, lng: lng }); // Recentrer la carte
+            map.setZoom(18); // Zoom plus élevé pour voir l'adresse de manière plus proche
+        }
+    </script>
+</body>
+</html>
