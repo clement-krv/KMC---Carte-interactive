@@ -1,99 +1,213 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KMC x CK - Map</title>
-
-    <!-- CDN Tailwind CSS pour le style -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Scripts pour intégrer les API Here Maps -->
-    <script src="https://js.api.here.com/v3/3.1/mapsjs-core.js"></script>
-    <script src="https://js.api.here.com/v3/3.1/mapsjs-service.js"></script>
-    <script src="https://js.api.here.com/v3/3.1/mapsjs-mapevents.js"></script>
-    <script src="https://js.api.here.com/v3/3.1/mapsjs-ui.js"></script>
-    <link rel="stylesheet" type="text/css" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KMC x CK - Map</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://js.api.here.com/v3/3.1/mapsjs-core.js"></script>
+  <script src="https://js.api.here.com/v3/3.1/mapsjs-service.js"></script>
+  <script src="https://js.api.here.com/v3/3.1/mapsjs-mapevents.js"></script>
+  <script src="https://js.api.here.com/v3/3.1/mapsjs-ui.js"></script>
+  <script src="https://js.api.here.com/v3/3.1/mapsjs-geometry.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf/turf.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css">
+  <style>
+    .H_ui_control_zoom .H_ui_button {
+      width: 30px;
+      height: 30px;
+    }
+    .H_scale_bar {
+      display: none !important;
+    }
+    .drawing-cursor {
+      cursor: crosshair;
+    }
+  </style>
 </head>
 <body class="flex flex-col items-center justify-center h-screen bg-gray-100 space-y-4">
+  <div id="instructions" class="text-center text-gray-700 font-semibold"></div>
+  <div id="mapContainer" class="relative w-[28rem] h-96 border border-gray-300 rounded-lg shadow-lg"></div>
+  <div class="absolute top-4 right-4 space-y-2">
+    <button id="drawButton" class="px-4 py-2 bg-blue-500 text-white rounded">Dessiner une surface</button>
+    <button id="clearButton" class="px-4 py-2 bg-red-500 text-white rounded">Effacer</button>
+  </div>
+  <div class="w-[28rem] relative mt-4">
+    <input id="addressInput" type="text" placeholder="Entrez une adresse" class="w-full p-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none">
+    <ul id="suggestions" class="w-full max-h-40 bg-white border border-gray-300 rounded-lg shadow-lg overflow-auto mt-2"></ul>
+  </div>
+  <div id="areaDisplay" class="text-gray-700 font-semibold mt-4"></div>
 
-    <!-- Conteneur de la carte avec style Tailwind pour l'affichage -->
-    <div id="mapContainer" class="w-[28rem] h-96 border border-gray-300 rounded-lg shadow-lg"></div>
+  <script>
+    const platform = new H.service.Platform({
+      apikey: '6CZQ8XgX54xFIrG8Zmpd19VKZYUDdUUnqD3BdU4XBJE'
+    });
+    const defaultLayers = platform.createDefaultLayers();
+    const satelliteLayer = defaultLayers.raster.satellite.xbase;
 
-    <!-- Champ de saisie pour rechercher une adresse sous la carte -->
-    <div class="w-[28rem] relative">
-        <input id="addressInput" type="text" placeholder="Entrez une adresse" class="w-full p-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none">
-    </div>
+    const map = new H.Map(document.getElementById('mapContainer'), satelliteLayer, {
+      center: { lat: 48.8566, lng: 2.3522 },
+      zoom: 12,
+      pixelRatio: window.devicePixelRatio || 1
+    });
 
-    <!-- Liste des suggestions d'adresses affichée sous le champ de recherche -->
-    <ul id="suggestions" class="w-[28rem] max-h-40 bg-white border border-gray-300 rounded-lg shadow-lg overflow-auto mt-2"></ul>
+    const behavior = new H.mapevents.Behavior(new H.mapevents.MapEvents(map));
+    const ui = H.ui.UI.createDefault(map, defaultLayers);
+    ui.removeControl('mapsettings');
+    ui.getControl('zoom').setAlignment('top-left');
 
-    <script>
-        // Initialiser la plateforme Here Maps avec la clé API
-        const platform = new H.service.Platform({
-        apikey: '6CZQ8XgX54xFIrG8Zmpd19VKZYUDdUUnqD3BdU4XBJE'
+    window.addEventListener('resize', () => map.getViewPort().resize());
+
+    async function getSuggestions(query) {
+      const url = `https://autosuggest.search.hereapi.com/v1/autosuggest?apikey=6CZQ8XgX54xFIrG8Zmpd19VKZYUDdUUnqD3BdU4XBJE&q=${query}&at=48.8566,2.3522`;
+      const response = await fetch(url);
+      const data = await response.json();
+      return data.items.slice(0, 4);
+    }
+
+    const addressInput = document.getElementById('addressInput');
+    const suggestionsList = document.getElementById('suggestions');
+
+    addressInput.addEventListener('input', async () => {
+      const query = addressInput.value;
+      if (query.length > 2) {
+        const suggestions = await getSuggestions(query);
+        suggestionsList.innerHTML = '';
+        suggestions.forEach(item => {
+          const li = document.createElement('li');
+          li.textContent = item.title;
+          li.className = 'p-2 cursor-pointer hover:bg-gray-100';
+          li.addEventListener('click', () => {
+            addressInput.value = item.title;
+            suggestionsList.innerHTML = '';
+            centerMapOnAddress(item.position.lat, item.position.lng);
+          });
+          suggestionsList.appendChild(li);
         });
+      } else {
+        suggestionsList.innerHTML = '';
+      }
+    });
 
-        // Obtenir une couche satellite sans étiquettes (xbase masque les noms de rues et labels)
-        const defaultLayers = platform.createDefaultLayers();
-        const satelliteLayer = defaultLayers.raster.satellite.xbase;
+    function centerMapOnAddress(lat, lng) {
+      map.setCenter({ lat: lat, lng: lng });
+      map.setZoom(20);
+    }
 
-        // Initialiser la carte dans le conteneur "mapContainer" avec la vue satellite centrée sur Paris
-        const map = new H.Map(document.getElementById('mapContainer'), satelliteLayer, {
-        center: { lat: 48.8566, lng: 2.3522 }, // Coordonnées de Paris
-        zoom: 12, // Niveau de zoom initial
-        pixelRatio: window.devicePixelRatio || 1
-        });
+    let drawingEnabled = false;
+    let polyline;
+    let polygonLineString = new H.geo.LineString();
+    let tempLine;
+    let points = [];
+    let markers = [];
+    let firstMarker = null;
+    const instructions = document.getElementById('instructions');
+    const tolerance = 15;
 
-        // Ajouter un comportement de zoom et déplacement à la carte
-        const behavior = new H.mapevents.Behavior(new H.mapevents.MapEvents(map));
-    
-        // Interface utilisateur avec contrôle de zoom, sans contrôle de changement de vue
-        const ui = H.ui.UI.createDefault(map, defaultLayers);
-        ui.removeControl('mapsettings'); // Retirer le contrôle de type de carte
+    document.getElementById('drawButton').addEventListener('click', () => {
+      drawingEnabled = true;
+      map.getElement().classList.add('drawing-cursor');
+      polygonLineString = new H.geo.LineString();
+      points = [];
+      markers.forEach(marker => map.removeObject(marker));
+      markers = [];
+      if (polyline) map.removeObject(polyline);
+      polyline = null;
+      if (tempLine) map.removeObject(tempLine);
+      tempLine = null;
+      if (firstMarker) map.removeObject(firstMarker);
+      firstMarker = null;
+      instructions.textContent = "Cliquez pour dessiner votre surface. Cliquez sur le premier point pour fermer le polygone.";
+    });
 
-        // Assurer que la carte se redimensionne correctement avec la fenêtre
-        window.addEventListener('resize', () => map.getViewPort().resize());
+    document.getElementById('clearButton').addEventListener('click', () => {
+      drawingEnabled = false;
+      map.getElement().classList.remove('drawing-cursor');
+      if (polyline) map.removeObject(polyline);
+      polyline = null;
+      if (tempLine) map.removeObject(tempLine);
+      tempLine = null;
+      markers.forEach(marker => map.removeObject(marker));
+      markers = [];
+      if (firstMarker) map.removeObject(firstMarker);
+      firstMarker = null;
+      polygonLineString = new H.geo.LineString();
+      points = [];
+      instructions.textContent = "";
+      document.getElementById('areaDisplay').textContent = "";
+    });
 
-        // Fonction pour obtenir des suggestions d'adresses basées sur l'API Here Autosuggest
-        async function getSuggestions(query) {
-        // Construire l'URL de l'API avec la requête d'adresse et les coordonnées de base
-            const url = `https://autosuggest.search.hereapi.com/v1/autosuggest?apikey=6CZQ8XgX54xFIrG8Zmpd19VKZYUDdUUnqD3BdU4XBJE&q=${query}&at=48.8566,2.3522`;
-            const response = await fetch(url);
-            const data = await response.json();
-            return data.items.slice(0, 4); // Limiter les suggestions à 4 résultats
+    function isCloseToFirstPoint(coord) {
+      if (points.length === 0) return false;
+      const firstPoint = points[0];
+      const screenPoint = map.geoToScreen(coord);
+      const firstScreenPoint = map.geoToScreen(firstPoint);
+      const dx = screenPoint.x - firstScreenPoint.x;
+      const dy = screenPoint.y - firstScreenPoint.y;
+      return Math.sqrt(dx * dx + dy * dy) <= tolerance;
+    }
+
+    function calculateArea() {
+      const coordinates = points.map(point => [point.lng, point.lat]);
+      coordinates.push([points[0].lng, points[0].lat]);
+      const polygon = turf.polygon([coordinates]);
+      const area = turf.area(polygon);
+      document.getElementById('areaDisplay').textContent = `Surface: ${area.toFixed(2)} m²`;
+    }
+
+    map.addEventListener('tap', function(evt) {
+      if (!drawingEnabled) return;
+
+      const coord = map.screenToGeo(evt.currentPointer.viewportX, evt.currentPointer.viewportY);
+
+      if (points.length > 2 && isCloseToFirstPoint(coord)) {
+        drawingEnabled = false;
+        map.getElement().classList.remove('drawing-cursor');
+        polygonLineString.pushPoint(points[0]);
+        if (polyline) polyline.setGeometry(polygonLineString);
+        instructions.textContent = "Polygone fermé.";
+        calculateArea();
+      } else {
+        polygonLineString.pushPoint(coord);
+        points.push(coord);
+
+        if (!polyline) {
+          polyline = new H.map.Polyline(polygonLineString, {
+            style: { strokeColor: 'rgba(255, 255, 0, 0.7)', lineWidth: 3 }
+          });
+          map.addObject(polyline);
+        } else {
+          polyline.setGeometry(polygonLineString);
         }
 
-        // Gestion de l'entrée de l'utilisateur dans le champ de recherche et affichage des suggestions
-        const addressInput = document.getElementById('addressInput');
-        const suggestionsList = document.getElementById('suggestions');
-
-        addressInput.addEventListener('input', async () => {
-            const query = addressInput.value;
-            if (query.length > 2) { // Rechercher si l'entrée est de plus de 2 caractères
-                const suggestions = await getSuggestions(query);
-                suggestionsList.innerHTML = ''; // Effacer les suggestions précédentes
-                suggestions.forEach(item => {
-                    const li = document.createElement('li');
-                    li.textContent = item.title; // Afficher le titre de l'adresse
-                    li.className = 'p-2 cursor-pointer hover:bg-gray-100';
-                    li.addEventListener('click', () => {
-                        addressInput.value = item.title; // Mettre l'adresse sélectionnée dans le champ de saisie
-                        suggestionsList.innerHTML = ''; // Effacer les suggestions
-                        centerMapOnAddress(item.position.lat, item.position.lng); // Centrer la carte sur l'adresse
-                    });
-                suggestionsList.appendChild(li); // Ajouter la suggestion à la liste
-                });
-            } else {
-                suggestionsList.innerHTML = ''; // Effacer les suggestions si la requête est courte
-            }
-        });
-
-        // Fonction pour centrer la carte sur une adresse sélectionnée avec un niveau de zoom plus précis
-        function centerMapOnAddress(lat, lng) {
-            map.setCenter({ lat: lat, lng: lng }); // Recentrer la carte
-            map.setZoom(18); // Zoom plus élevé pour voir l'adresse de manière plus proche
+        if (points.length === 1) {
+          const firstCircleIcon = new H.map.Icon('<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12"><circle cx="6" cy="6" r="6" fill="red" /></svg>');
+          firstMarker = new H.map.Marker(coord, { icon: firstCircleIcon });
+          map.addObject(firstMarker);
+        } else {
+          const circleIcon = new H.map.Icon('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><circle cx="5" cy="5" r="5" fill="#007bff" /></svg>');
+          const marker = new H.map.Marker(coord, { icon: circleIcon });
+          map.addObject(marker);
+          markers.push(marker);
         }
-    </script>
+      }
+    });
+
+    map.addEventListener('pointermove', function(evt) {
+      if (!drawingEnabled || points.length < 1) return;
+
+      const coord = map.screenToGeo(evt.currentPointer.viewportX, evt.currentPointer.viewportY);
+
+      if (tempLine) map.removeObject(tempLine);
+
+      const tempLineString = new H.geo.LineString();
+      tempLineString.pushPoint(points[points.length - 1]);
+      tempLineString.pushPoint(coord);
+      tempLine = new H.map.Polyline(tempLineString, {
+        style: { strokeColor: 'rgba(255, 255, 0, 0.5)', lineWidth: 2 }
+      });
+      map.addObject(tempLine);
+    });
+  </script>
 </body>
 </html>
