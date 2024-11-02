@@ -11,7 +11,7 @@ Cette application web permet d'afficher une carte satellite interactive avec la 
 
 ## Prérequis
 
-1. **API Key HERE Maps** : Pour utiliser cette application, vous avez besoin d'une clé API HERE Maps. Vous pouvez l'obtenir en vous inscrivant sur [HERE Developer](https://developer.here.com/).
+1. **API Key HERE Maps** : Pour utiliser cette application, vous avez besoin d'une clé API HERE Maps. Vous pouvez l'obtenir en vous inscrivant sur <a href="https://developer.here.com/" target="_blank">HERE Developer</a>.
 2. **Connexion Internet** : La carte et les services de recherche nécessitent une connexion Internet.
 
 ## Installation
@@ -33,7 +33,7 @@ Dans le code, assurez-vous que la clé API HERE Maps est correcte :
     });
     ```
 
-Pour pouvoir avoir sa propre clé API veuillez suivre cette documentation [ici](https://www.here.com/docs/bundle/maps-api-for-javascript-developer-guide/page/topics/quick-start.html)
+Pour pouvoir avoir sa propre clé API veuillez suivre cette documentation <a href="https://www.here.com/docs/bundle/maps-api-for-javascript-developer-guide/page/topics/quick-start.html" target="_blank">ici</a>
 
 4. Lancez le fichier index.html dans votre navigateur pour voir l'application.
 
@@ -108,4 +108,4 @@ const map = new H.Map(document.getElementById('mapContainer'), platform.createDe
 
 ## Auteur 
 
-Développé par [Clément Kerviche](https://www.linkedin.com/in/votre_nom_utilisateur) en partenariat avec [Komunic](https://komunic.com)
+Développé par <a href="https://www.linkedin.com/in/votre_nom_utilisateur" target="_blank">Clément Kerviche</a> en partenariat avec <a href="https://komunic.com" target="_blank">Komunic</a>
